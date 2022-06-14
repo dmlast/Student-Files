@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(pander)
+dc <- read.csv(file.choose())
+ADJ2001 <- as.matrix(subset(x = dc, year == 2001, header = FALSE))%*%t(as.matrix(subset(x = dc, year == 2001, header = FALSE))) 
+zzz <- igraph::graph.adjacency(ADJ2001)
+library(sand)
+library(igraph)
+devtools::install_github("briatte/ggnet")
+library(ggnet)
+
+library(network)
+library(sna)
+library(ggplot2)
+g.plot <- ggnet(ADJ2001, mode = 'kamadakawai', size = 4)
+g.plot
+ADJ2001 <- as.matrix(subset(x = dc, year == 2001, header = FALSE)$CP) %*% t(as.matrix(subset(x = dc, year == 2001, header = FALSE)$CP)) 
+ADJ2002 <- as.matrix(subset(x = dc, year == 2002, header = FALSE)$CP) %*% t(as.matrix(subset(x = dc, year == 2002, header = FALSE)$CP)) 
+ADJ2003 <- as.matrix(subset(x = dc, year == 2003, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2003, header = FALSE)$CP)) 
+ADJ2004 <- as.matrix(subset(x = dc, year == 2004, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2004, header = FALSE)$CP)) 
+ADJ2005 <- as.matrix(subset(x = dc, year == 2005, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2005, header = FALSE)$CP)) 
+ADJ2006 <- as.matrix(subset(x = dc, year == 2006, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2006, header = FALSE)$CP)) 
+ADJ2007 <- as.matrix(subset(x = dc, year == 2007, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2007, header = FALSE)$CP)) 
+ADJ2008 <- as.matrix(subset(x = dc, year == 2008, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2008, header = FALSE)$CP)) 
+ADJ2009 <- as.matrix(subset(x = dc, year == 2009, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2009, header = FALSE)$CP)) 
+ADJ2010 <- as.matrix(subset(x = dc, year == 2010, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2010, header = FALSE)$CP)) 
+ADJ2011 <- as.matrix(subset(x = dc, year == 2011, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2011, header = FALSE)$CP)) 
+ADJ2012 <- as.matrix(subset(x = dc, year == 2012, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2012, header = FALSE)$CP)) 
+ADJ2013 <- as.matrix(subset(x = dc, year == 2013, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2013, header = FALSE)$CP)) 
+ADJ2014 <- as.matrix(subset(x = dc, year == 2014, header = FALSE)$CP)%*%t(as.matrix(subset(x = dc, year == 2014, header = FALSE)$CP)) 
+library("sna")
+library("network")
+
+
+```
