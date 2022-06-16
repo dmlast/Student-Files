@@ -1,0 +1,211 @@
+---
+title: "R Notebook"
+output:Lastovetsky_CDA_HW_bonus
+---
+
+
+```{r}
+library(foreign)
+library(dplyr)
+library(ggplot2)
+library(mfx)
+library(glm.predict)
+library(sandwich)
+library(stargazer)
+library(msm)
+```
+Задание 1
+```{r}
+df <- read.csv(file.choose())
+df$prog <- as.factor(df$prog)
+```
+Переменную prog необходимо представить как факторную, потому что содержательно она интерпретируется скорее как номинальная (the type of program in which the students were enrolled)
+
+```{r}
+hist(df$num_awards)
+
+```
+Распределение внешне очень похоже на экспоненциальное.
+```{r}
+ggplot(df, aes(num_awards, fill = prog)) +
+  geom_histogram(binwidth=.5, position="dodge")
+```
+
+
+
+Да, существует очевидная специфика распределния в зависимости от программы. Так, к примеру, для первой программы значения не превосходят 1, для второй группы - не превосходят 6, для третьей - не превосходят 2; тем не менее, для каждой из групп распределения все еще похожи на экспоненциальные с различными параметрами. 
+
+Задание 2. 
+Для оценивания Пуассона: 
+1. Отклик в нашей модели является counts, так как содержательно представляет из себя the number of awards earned by students at a high school in a year.
+2. Отклик в нашей модели целочисленный и неотрицательный. 
+3. На данный момент мы предполагаем, что распределение в целом отвечает требованиям распределения Пуассона с низким значением лямбды, и, также, предполагаем, что среднее и вариация в модели равны друг другу. Это наиболее мощное допущение, которое мы будем тестировать в дальнейшем (я надеюсь)
+4. Предикторы факторные или непрерывные. 
+5. Предикторы потенциально независимы между собой. 
+
+Нам кажется, что нет оснований для оценки линейной модели. Нет оснований предполагать, что отклик связан с предикторами линейно; кроме того, отклик не является непрерывным и вряд ли разумно аппроксимировать его к непрерывному. 
+
+Задание 3. 
+
+```{r}
+null.poisson <- glm(num_awards ~ 1, family="poisson", data=df)
+summary(null.poisson)
+lambda_null <- exp(null.poisson$coefficients)
+lambda_null
+```
+Параметр равен 0.63. Интерпретация состоит в том, можем ли мы представить, что log(lambda) = beta_0; иначе говоря, оценка гвоорит о том, что в предположении о пуассоновском распределении модели в ней среднее равно вариации и равно 0.63. 
+
+```{r}
+pchisq(null.poisson$deviance, df=null.poisson$df.residual, lower.tail=FALSE)
+```
+H_0: модель задана корректно, т.е. нет значимых расхождений между предсказанными на основе распределения Пуассона и наблюдаемыми значениями зависимой переменной
+Так как значение p_val < 0.05, наблюдаемое распределение не совпадает с ожидаемым распределением. 
+
+Задание 4. 
+
+4.1. $\hat\lambda = \exp(\hat\beta_0 + \hat\beta_1x_1 + \hat\beta_2x_2 \hat\beta_3x_3)$
+Где $\hat\lambda$ - оценка параметра $\lambda$, $\hat\beta_i$ - оценка i-ого коэффициента, $x_1$ - math, $x_2$ - prog2, $x_3$ - prog3
+
+4.2. 
+```{r}
+
+m1.poisson <- glm(num_awards ~  math + prog, family="poisson", data=df)
+summary(m1.poisson)
+lambda_m1 <- exp(sum(m1.poisson$coefficients * 
+                       c(1, mean(df$math), 1, 1)))
+lambda_m1
+```
+$\lambda = 0.9045813$
+4.3.
+
+```{r}
+pchisq(m1.poisson$deviance, df=m1.poisson$df.residual, lower.tail=FALSE)
+
+```
+H_0: модель задана корректно, т.е. нет значимых расхождений между предсказанными на основе распределения Пуассона и наблюдаемыми значениями зависимой переменной
+Так как значение p_val > 0.05, наблюдаемое распределение совпадает с ожидаемым распределением.
+Мы можем допустить отсутствие значимых расхождений между данными и моделью. 
+4.4.
+
+
+```{r}
+df$phat <- predict(m1.poisson, type="response")
+hist0 <- function(...,col='skyblue',border=T) hist(...,col=col,border=border) 
+hist2 <- function(var1, var2,name1='',name2='',
+              breaks = min(max(length(var1), length(var2)),20), 
+              main0 = "", alpha0 = 0.5,grey=0,border=F,...) {    
+
+library(scales)
+  colh <- c(rgb(0, 1, 0, alpha0), rgb(1, 0, 0, alpha0))
+  if(grey) colh <- c(alpha(grey(0.1,alpha0)), alpha(grey(0.9,alpha0)))
+
+  max0 = max(var1, var2)
+  min0 = min(var1, var2)
+
+  den1_max <- hist(var1, breaks = breaks, plot = F)$density %>% max
+  den2_max <- hist(var2, breaks = breaks, plot = F)$density %>% max
+  den_max <- max(den2_max, den1_max)*1.2
+  var1 %>% hist0(xlim = c(min0 , max0) , breaks = breaks,
+                 freq = F, col = colh[1], ylim = c(0, den_max), main = main0,border=border,...)
+  var2 %>% hist0(xlim = c(min0 , max0),  breaks = breaks,
+                 freq = F, col = colh[2], ylim = c(0, den_max), add = T,border=border,...)
+  legend(min0,den_max, legend = c(
+    ifelse(nchar(name1)==0,substitute(var1) %>% deparse,name1),
+    ifelse(nchar(name2)==0,substitute(var2) %>% deparse,name2),
+    "Overlap"), fill = c('white','white', colh[1]), bty = "n", cex=1,ncol=3)
+
+  legend(min0,den_max, legend = c(
+    ifelse(nchar(name1)==0,substitute(var1) %>% deparse,name1),
+    ifelse(nchar(name2)==0,substitute(var2) %>% deparse,name2),
+    "Overlap"), fill = c(colh, colh[2]), bty = "n", cex=1,ncol=3) }
+hist2(df$num_awards,df$phat,breaks = 10)
+
+```
+Расхождения выглядят не слишком большими, в основном модель не улавливает "выбросы". 
+4.5. 
+```{r}
+summary(m1.poisson)
+```
+Все оценки значимы кроме prog3
+
+```{r}
+exp(m1.poisson$coefficients)
+```
+При росте math на 1 в среднем num_awards растёт на примерно 7 процентов при прочих равных. 
+У студентов prog_2 среднее число num_awards выше чем у студентов prog_1 примерно на 195% при прочих равных. 
+У студентов prog_3 среднее число num_awards выше чем у студентов prog_1 примерно на 44.7% при прочих равных. 
+У студентов prog_1 среднее ожидаемое число num_awards примерно равно 0 при равенстве math нулю. 
+
+4.6. 
+
+```{r}
+cov.m1 <- vcovHC(m1.poisson, type="HC0")
+std.err <- sqrt(diag(cov.m1))
+r.est <- cbind(Estimate= coef(m1.poisson), "Robust SE" = std.err,
+"Pr(>|z|)" = 2 * pnorm(abs(coef(m1.poisson)/std.err), lower.tail=FALSE),
+LL = coef(m1.poisson) - 1.96 * std.err,
+UL = coef(m1.poisson) + 1.96 * std.err)
+s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
+                                                coef(m1.poisson), cov.m1)
+
+## exponentiate old estimates dropping the p values
+rexp.est <- exp(r.est[, -3])
+## replace SEs with estimates for exponentiated coefficients
+rexp.est[, "Robust SE"] <- s
+
+rexp.est
+```
+Процентное изменение incident rate для num_awards составляет 7% для каждого повышения math на 1. 
+
+4.7. 
+
+```{r}
+dc(m1.poisson, 
+   values1 = c(1, mean(df$math), 0, 0), 
+   values2 = c(1, mean(df$math), 1, 0)
+)
+```
+
+В среднем у студентов prog2 отклик ниже на 0.41, чем у студентов prog1, при прочих равных. Разница статистически значима, так как 0 не входит в доверительный интервал. 
+
+4.8. 
+```{r}
+df <- df[with(df, order(prog, math)), ]
+ggplot(df, aes(x = math, y = phat, colour = prog)) +
+  geom_point(aes(y = num_awards), alpha=.5, position=position_jitter(h=.2)) +
+  geom_line(size = 1) +
+  labs(x = "Math Score", y = "Expected number of awards")
+```
+Визуально видны значительные отклонения прогнозируемых значений от фактических, к примеру, для второй программы. 
+
+Задание 5. 
+
+Нужно понять, насколько действительно мы можем предполагать равенство среднего и дисперсии. 
+
+
+```{r}
+mean(df$num_awards)
+var(df$num_awards)
+var(df$num_awards)/mean(df$num_awards)
+
+```
+Мы вряд ли можем предполагать такого равенства, т.к. дисперсия больше среднего на 76 процентов, это явный overdispersion. Переоценим отрицательную биномиальную модель:
+
+```{r}
+nb.model <- glm.nb(num_awards ~  math + prog, data=df)
+summary(nb.model)
+
+negbinirr(num_awards ~  math + prog, data=df)
+
+```
+
+При росте math на 1 в среднем num_awards растёт на примерно 7 процентов при прочих равных. 
+У студентов prog_2 среднее число num_awards выше чем у студентов prog_1 примерно на 193% при прочих равных. 
+У студентов prog_3 среднее число num_awards выше чем у студентов prog_1 примерно на 44.3% при прочих равных. 
+Оценка коэффициента при Prog3 не значима. 
+
+Задание 6.
+
+1. Изучение частоты покупки ёлок индивидами в течение года в зависимости от семейного положения. Значение близко к 1, мы можем предполагать близость дисперсии к среднему. 
+
+2. Изучение частоты посещения гражданами старше 75 лет больниц в течение года в зависимости от гендера. Значение высокое, мы вряд ли можем предполагать близость дисперсии и среднего. 
