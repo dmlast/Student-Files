@@ -1,0 +1,153 @@
+---
+title: "Ластовецкий_ДЗ3"
+author: "Ластовецкий"
+date: "20/06/2021"
+output:
+  html_document:
+    df_print: paged
+
+lang: ru-RU
+---
+
+```{r setup, include=FALSE}
+#install.packages("foreign") 
+#install.packages("psych") 
+#install.packages("GGally")
+#install.packages("GPArotation") 
+#install.packages("nFactors")
+#install.packages("lavaan") 
+#install.packages("semTools") 
+#install.packages("semPlot")
+#install.packages("openxlsx")
+#install.packages("pander")
+```
+```{r, include=FALSE}
+library(foreign)
+library(psych)
+library(GGally)
+library(GPArotation)
+library(nFactors)
+library(lavaan)
+library(semTools)
+library(semPlot)
+library(openxlsx)
+library(pander)
+```
+```{r, include=FALSE}
+id <- "180OamTFpLLoR8OiffNe55Em4g0cxEGaA"
+df <- read.xlsx(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+df <- na.omit(df)
+df1 <- subset(df, select = c(`V131:.Democracy:.Governments.tax.the.rich.and.subsidize.the.poor.`, `V132:.Democracy:.Religious.authorities.interpret.the.laws.`, `V133:.Democracy:.People.choose.their.leaders.in.free.elections.`, `V134:.Democracy:.People.receive.state.aid.for.unemployment.`,  `V135:.Democracy:.The.army.takes.over.when.government.is.incompetent.`, `V136:.Democracy:.Civil.rights.protect.people’s.liberty.against.oppression.`, `V137:.Democracy:.The.state.makes.people's.incomes.equal`, `V138:.Democracy:.People.obey.their.rulers`, `V139:.Democracy:.Women.have.the.same.rights.as.men.`))
+colnames(df1) <- c("V131", "V132", "V133", "V134", "V135", "V136", "V137", "V138", "V139")
+View(df1)
+kmo <- KMO(df1)
+```
+# Задание 1
+Для анализа я выбрал данные по Казахстану. Исследование там проводилось в 2011 году, когда страна управлялась еще Нурсултаном Назарбаевым, который традиционно придерживался сложной конфигурации западного и восточного в политике. Мы предполагаем, что способа интерпретации демократии также будет два - более западный и более восточный, латентными факторами будут соответствующие понимания политических институтов. 
+Для начала проверим применимость факторного анализа с помощью критерия Кайзера-Майера-Олкина. Значение критерия равно `r kmo$MSA` , что в целом абсолютно приемлемо и делает факторный анализ возможным. 
+
+Посмотрим на предполагаемое число факторов:
+
+```{r, echo=FALSE}
+ggcorr(df1, nbreaks = 5, label = T, size = 4, hjust = 0.9)
+corr <- cor(df1)
+VSS.scree(corr)
+```
+
+Cудя по графику, фактора два. Посмотрим на параллельный анализ:
+
+```{r, echo = FALSE}
+eigen <- eigen(corr) 
+p <- parallel(var = ncol(df1), subject = nrow(df1), rep = 1000)$eigen$mevpea
+screeplot <- nScree(x=eigen$values, aparallel = p)
+plotnScree(screeplot) 
+```
+
+
+Параллельный анализ также предполагает два фактора. 
+Hазведывательный факторный анализ:
+
+```{r, echo = FALSE}
+efa1 <- fa(r = corr, nfactors = 2, fm = "pa", rotate = "varimax") # pa - principal factor FA
+efa1
+print(efa1$loadings, cutoff=0.3)
+```
+
+Разведывательный ФА подтверждает гипотезу о двух факторах. RSMR = 0.04, что меньше 0.08, т.е. модель хорошо подогнана. Обхясненная вариация равна 0.4. Это не лучшие показатели, возможно, что из модели следует изъять ряд вопросов. 
+
+
+
+
+# Задание 2. 
+
+Я все еще предполагаю наличие двух факторов. Однако, наибольшим весом в первом факторе обладают 133, 137, 136 и 139 вопросы, во втором 132 и 135. Таким образом, мы можем использовать данные вопросы как наиболее маркирующие для ФА. 
+```{r, echo = FALSE}
+cfa1 <- 'west =~ V139 + V136 + V137 + V133
+east =~ V132 + V135'
+
+model1 <- cfa(cfa1, df1)
+summary(model1, fit.measures = TRUE, standardized = TRUE)
+```
+ 
+Здесь результаты очень хорошие. P-value для Chi-sq равна 0, а это значит, что модель значима. Модель хорошо проходит CFI and TLI (0,96 and 0,93). RMSEA достаточно высокий ( 0.073), но это можно объяснить порядковым характером данных.  
+
+С точки зрения интерпретации показателей: 
+
+При росте СКО west и east на 1 показатели возрастают соответственно на:
+
+ west                            
+ 
+    V139 0.674
+    
+    V136 0.734
+    
+    V137 0.600
+    
+    V133 0.673
+    
+  east 
+  
+    V132 2.2
+    
+    V135 0.17 
+
+Специфичности большей частью достаточно низкие:
+
+ 
+   .V139 0.546
+   .V136 0.461
+   .V137 0.640
+   .V133 0.548
+   .V132 -3.826
+   .V135 0.969
+
+Исключением выступает вопрос 135. Это объяснимо характером вопроса и его изначальными низкими корреляциями.
+
+# Задание 3
+
+Взглянем на варианты модификации модели: 
+
+```{r, echo=FALSE}
+mepc <- modindices(model1, sort. = TRUE)
+pander(mepc)
+```
+
+Наибольшие mi и epc у варианта V139   ~~   V136 . Протестируем модель в таком виде:
+
+```{r, echo = FALSE}
+cfa2 <- 'west =~ V139 + V136 + V137 + V133
+east =~ V132 + V135
+V139 ~~ V136'
+
+model2 <- cfa(cfa2, df1)
+summary(model2, fit.measures = TRUE, standardized = TRUE)
+```
+
+Подобная спецификация модели оказалась гораздо лучше по основным мерам качества. Выросли показатели CFI TLI (наша модель стала более значимой по сравнению с базовой), уменьшился RMSEA до 0,05, так что теперь наша модель стала более значимой с точки зрения статистических критериев. Общности у всех показателей, кроме 137, увеличились, а специфичности уменьшились. Так что спецификация модели с предположением об автокорреляции оказалась более статистически достоверной и у нас есть основания ее принять. 
+           
+```{r}
+semPaths(model2, "std", rotation = 2, colFactor = 0, sizeMan = 20, sizeMan2 = 10, sizeLat = 15, edge.color = "red",
+edge.label.cex = 1, esize = 1)
+```
+
+

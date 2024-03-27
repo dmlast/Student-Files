@@ -1,0 +1,110 @@
+---
+title: "ФА по Украине"
+output: html_notebook
+---
+
+Для анализа я решил выбрать Украину. Сбор данных проводился в 2011 году, за три года до событий на Майдане, так что взгляды украинцев на демократию в этот период представляют определенный исследовательский интерес. Предварительно выдвину гипотезу о том, что взгляды на демократию отличаются между условно правым, более лояльным правительству Януковича крылом, и более радикальным-левым. 
+
+```{r}
+install.packages("foreign")
+install.packages("psych")
+install.packages("GGally")
+install.packages("GPArotation")
+install.packages("nFactors")
+install.packages("openxlsx")
+```
+```{r}
+library(foreign)
+library(psych)
+library(GGally)
+library(GPArotation)
+library(nFactors)
+library(openxlsx)
+```
+```{r}
+id <- "1MeHF94Os5ARxtALP091LtVfIV8B9wIBC"
+df <- read.xlsx(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+df <- na.omit(df)
+
+View(df)
+```
+Для начала опишем данные:
+
+V131: Democracy: Governments tax the rich and subsidize the poor.	
+
+V132: Democracy: Religious authorities interpret the laws.
+
+V133: Democracy: People choose their leaders in free elections.	
+
+V134: Democracy: People receive state aid for unemployment.	
+
+V135: Democracy: The army takes over when government is incompetent.
+
+V136: Democracy: Civil rights protect people’s liberty against oppression.
+
+V137: Democracy: The state makes people's incomes equal	
+
+V138: Democracy: People obey their rulers	
+
+V139: Democracy: Women have the same rights as men.
+
+Теперь исследуем применимость факторного анализа
+```{r}
+corr <- cor(df)
+corr
+ggcorr(data = df, label = T)
+KMO(df)
+```
+V138 очень выбивается из корреляционной матрицы и, скорее всего, будет очень лишней в факторном анализе. 
+
+
+Kaiser-Meyer-Olkin factor adequacy
+Call: KMO(r = df)
+Overall MSA =  0.81
+MSA for each item = 
+V131 V132 V133 V134 V135 V136 V137 V138 V139 
+0.86 0.57 0.83 0.85 0.57 0.83 0.83 0.68 0.86 
+
+Общий KMO очень высокий, все частные выше 0,5. Следовательно, факторный анализ применим!
+
+
+
+
+```{r}
+VSS.scree(corr)
+```
+
+График каменистой осыпи предполагает два фактора. 
+
+```{r}
+eigen <- eigen(cor(df))
+p <- parallel(var = ncol(df), subject = nrow(df), rep=1000)$eigen$mevpea
+screeplot <- nScree(x = eigen$values, aparallel = p)
+plotnScree(screeplot)
+```
+Параллельный анализ (или как он правильно называется) также предполагает 2 фактора. 
+
+Перейдем к самому EFA:
+```{r}
+efa1 <- fa(r = corr, nfactors = 2, fm = "pa", rotate = "varimax")
+efa1
+```
+Два фактора объяснили нам всего 37 процентов вариации суммарно, что немного грустно...
+
+```{r}
+efa2 <- fa(r = corr, nfactors = 2, fm = "pa", rotate = "oblimin")
+efa2
+```
+
+The root mean square of the residuals (RMSR) is  0.03 
+The df corrected root mean square of the residuals is  0.04
+
+RSMR < 0.08, так что модель неплохо подогнана!
+
+Однако, в большей части вопросов u^2 стабильно больше h^2. 
+
+Если все же признавать эффективным наш факторный анализ, несмотря на вышеупомянутые ограничения, то можно попробовать признать факторами идеологические предпочтения условно более лояльного и условно более леволиберального крыла, что связано с характером задаваемых вопросов.  
+
+Так, первый фактор имеет большие доли вопросов 133 и 136, которые очевидно связаны с либеральными пониманиями демократии (это вопросы о свободных выборах и гражданских правах). 
+
+Второй фактор имеет большие доли вопросов 132 и 135, связанные с более правым и консервативным пониманием демократии (это вопросы о роли религиозных лидеров и армии).

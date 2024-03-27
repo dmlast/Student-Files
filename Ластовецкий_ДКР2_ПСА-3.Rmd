@@ -1,0 +1,203 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+---
+title: "«Ластовецкий Дмитрий_ДКР2_ПСА-3"
+author: "Ластовецкий Дмитрий"
+date: "08 06 2021"
+output:
+  
+  pdf_document: default
+
+  word_document: default
+  html_document: default
+lang: ru-russian
+---
+
+```{r, echo=FALSE, message=FALSE}
+#install.packages("factoextra")
+#install.packages("fpc")
+#install.packages("dbscan")
+#install.packages("pander")
+#install.packages("openxlsx")
+#install.packages("MASS")
+#install.packages("moments") 
+#install.packages("normtest") 
+#install.packages("heplots") 
+#install.packages("class")
+#install.packages("gmodels") 
+
+library(factoextra)
+library(fpc)
+library(dbscan)
+library(pander)
+library(openxlsx)
+library(MASS)
+library(moments)
+library(normtest)
+library(heplots)
+library(dplyr)
+library(mixtools)
+library(mixdist)
+library(RBesT)
+library(class)
+library(gmodels)
+```
+# Задание 1:
+
+Для задачи классификации я решил выбрать датасет, использованный маркетологами банков Португалии. Описание всех оригинальных переменных можно прочитать на кэггл (https://www.kaggle.com/sonujha090/bank-marketing) Приведу описания только тех переменных, что пригодились мне в ходе исследования (после моих преобразований, замены строчных данных на binary), а также верхнюю часть итоговой таблицы данных:
+
+
+age (numeric)
+
+marital : marital status (1 - "married", 0 - "other")
+
+default: has credit in default? (binary: 1 - "yes", 0 - "no")
+
+balance: average yearly balance, in euros (numeric)
+
+housing: has housing loan? (binary: 1 - "yes", 0 - "no")
+
+day: last contact day of the month (numeric)
+
+duration: last contact duration, in seconds (numeric)
+
+campaign: number of contacts performed during this campaign and for this client (numeric, includes last contact)
+
+y - has the client subscribed a term deposit? (binary: "yes","no")
+
+
+
+```{r, echo=FALSE, results='asis'}
+id <- "1mM1c2ELUqgbt-xyjTKJXwMqhF6TR2nia"
+df1 <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+df1$marital[df1$marital == "married"] <- 1
+df1$marital[df1$marital != 1] <- 0
+df1$housing[df1$housing == "yes"] <- 1
+df1$housing[df1$housing != 1] <- 0
+df1$default[df1$default == "yes"] <- 1
+df1$default[df1$default != 1] <- 0
+df1$y[df1$y == "yes"] <- 2
+df1$y[df1$y != 2] <- 1
+
+df1 <- data.frame(as.numeric(df1$age), as.numeric(df1$marital), as.numeric(df1$default), as.numeric(df1$balance), as.numeric(df1$housing), as.numeric(df1$day), as.numeric(df1$duration), as.numeric(df1$campaign), as.numeric(df1$y))
+df1 <- na.omit(df1)
+colnames(df1) <- c("age", "marital", "default", "balance", "housing", "day", "duration", "campaign", "y")
+pander(head(df1))
+```
+Посмотрим также на summary наших данных:
+
+```{r, echo=FALSE, results='asis'}
+pander(summary(df1))
+```
+
+
+Соответственно, наша задача классификации состоит в том, чтобы понять, сделал ли клиент срочный депозит на основе первых восьми параметров. 
+
+# Задание 2. 
+Проверим корреляции показателей:
+```{r, echo=FALSE, results='asis'}
+pander(cor(df1))
+```
+В целом, они все достаточно низкие, кроме нескольких, чья мультиколлинеарность объяснима естественно (чем человек старше, тем, очевидно, больше вероятность, что он женат), поэтому мультиколлинеарность не будет проблемой для моделей. Наиболее значимыми показателями для целевой переменнной являются, судя по корреляционной матрице, duration и housing. 
+```{r, include=FALSE}
+set.seed(123)
+df1new <- mutate(df1, y = NULL)
+df1new
+tr.index = sample(1:nrow(df1new), nrow(df1new)*0.8) 
+trSet = df1new[tr.index, ]
+testSet = df1new[-tr.index, ]
+
+```
+
+Разделим данные на обучающую и тестовую выборки. В обучающую выборку вошло `r nrow(trSet)` наблюдений. В тестовой выборке `r nrow(testSet)` наблюдений. 
+
+# Задание 3. 
+
+Для начала обучим модель kNN. Мы предполагаем наличие 2 кластеров. 
+Представим матрицу ошибок на основе проверки обучающей выборки и основные меры качества: 
+
+```{r, echo=FALSE, results='markup'}
+
+set.seed(123)
+testSet1 <- df1[-tr.index, ]
+trSet1 <- df1[tr.index, ]
+prc_test_pred <- knn(train = trSet, test = testSet, cl = trSet1$y, k=60)
+
+CrossTable(x = prc_test_pred, y = testSet1$y)
+```
+Accuracy = TP / (TP + FP) = `r 794/(794+98)`
+
+Recall = TP / (TP + FN) = `r 794/(794+4)`
+
+Теперь проведём дискриминантный анализ. 
+
+```{r, echo=FALSE, results='asis'}
+
+lda.fit <- lda(y ~ age+marital+default+balance+housing+day+duration+campaign, data = trSet1)
+print("Априорные вероятности:")
+pander(lda.fit$prior)
+print("Групповые средние:")
+pander(lda.fit$means)
+print("Coefficients of linear discriminants:")
+pander(lda.fit$scaling)
+plot(lda.fit)
+```
+
+
+Все метрики качества для дискриминантного анализа продемонстрирую в следующем разделе. 
+
+# Задание 4. 
+
+Результаты тестирования kNN были уже представлены мной несколько выше, поэтому перейдем сразу к LDA:
+
+```{r, include = FALSE}
+lda.pred <- predict(lda.fit, testSet1)
+lda.class <- lda.pred$class
+```
+```{r, echo=FALSE, results='asis'}
+pander(table(lda.class, testSet1$y))
+```
+Accuracy = TP / (TP + FP) =  `r 782/(782+82)`
+
+Recall = TP / (TP + FN) = `r 782/(782+16)`
+
+
+Сравнивая модели, можно сказать, что accuracy несколько выше у LDA, а Recall у kNN, но в целом модели схожи. 
+
+# Задание 5. 
+
+```{r, echo=FALSE, results='asis'}
+id <- "1mQF-rLpX3i8LyrK9PCFF5YRqkrsPpwPy"
+data555 <- read.xlsx(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+datafr <- as.numeric(unlist(data555[1]))
+hist(datafr, breaks = 50)
+```
+
+На основе предварительного визуального анализа можно сказать, что в смеси присутствует три распределения:
+
+1. Нормальное с mu = 0, sigma = 25, l = 0.6
+2. Нормальное с mu = 100, sigma = 15, l = 0.4
+3. Нормальное с mu = 45, sigma = 40, l = 0.2
+
+
+Проверим наши предположеня и посмотрим на итоговую спецификацию:
+
+```{r, echo = FALSE, results='asis'}
+Model1 <- normalmixEM(datafr, lambda = c(0.6, 0.4, 0.2), mu = c(0, 100, 45), sigma = c(25, 15, 40))
+plot(Model1, density = TRUE)
+```
+
+```{r, echo = FALSE, results='asis'}
+summa <- data.frame(Model1$lambda, Model1$mu, Model1$sigma)
+colnames(summa) <- c("lambda", "mu", "sigma")
+pander(summa)
+```
+
+
+Мой номер в группе - 10. 10-ое наблюдение отосится к первой компоненте (>90%). 
+
